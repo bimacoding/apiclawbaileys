@@ -10,6 +10,10 @@ const {
 
 let sock = null;
 let isConnecting = false;
+let listenersBound = false;
+const messageWaiters = new Map();
+
+const MESSAGE_ACK_TIMEOUT_MS = Number(process.env.MESSAGE_ACK_TIMEOUT_MS || 20000);
 
 function normalizeJid(to) {
   if (!to || typeof to !== "string") {
@@ -53,6 +57,7 @@ async function connectWhatsApp() {
   });
 
   sock.ev.on("creds.update", saveCreds);
+  bindSocketListeners(sock);
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect } = update;
 
@@ -77,10 +82,78 @@ async function connectWhatsApp() {
   return sock;
 }
 
+function bindSocketListeners(client) {
+  if (listenersBound) return;
+
+  client.ev.on("messages.update", (updates) => {
+    for (const update of updates || []) {
+      const keyId = update?.key?.id;
+      if (!keyId) continue;
+
+      const waiter = messageWaiters.get(keyId);
+      if (!waiter) continue;
+
+      const status = Number(update?.update?.status || 0);
+      // status >= 1 menandakan pesan sudah di-ack oleh server/perangkat penerima.
+      if (status >= 1) {
+        waiter.resolve({ keyId, status });
+        messageWaiters.delete(keyId);
+      }
+    }
+  });
+
+  listenersBound = true;
+}
+
+async function ensureWhatsAppNumber(client, jid) {
+  const [check] = await client.onWhatsApp(jid);
+  if (!check?.exists) {
+    throw new Error("Nomor tujuan tidak terdaftar di WhatsApp");
+  }
+}
+
+function waitForMessageAck(keyId, timeoutMs = MESSAGE_ACK_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      messageWaiters.delete(keyId);
+      reject(
+        new Error(
+          "Pesan belum mendapatkan ACK dalam batas waktu. Coba ulang beberapa detik lagi."
+        )
+      );
+    }, timeoutMs);
+
+    messageWaiters.set(keyId, {
+      resolve: (payload) => {
+        clearTimeout(timer);
+        resolve(payload);
+      },
+      reject: (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    });
+  });
+}
+
+async function sendWithAck(client, jid, content) {
+  await ensureWhatsAppNumber(client, jid);
+  const sent = await client.sendMessage(jid, content);
+  const keyId = sent?.key?.id;
+
+  if (!keyId) {
+    throw new Error("Gagal mendapatkan ID message dari WhatsApp");
+  }
+
+  const ack = await waitForMessageAck(keyId);
+  return { sent, ack };
+}
+
 async function sendTextMessage({ to, text }) {
   if (!text) throw new Error("Parameter 'text' wajib diisi");
   const client = await connectWhatsApp();
-  return client.sendMessage(normalizeJid(to), { text });
+  const jid = normalizeJid(to);
+  return sendWithAck(client, jid, { text });
 }
 
 async function sendImageMessage({ to, imageUrl, imagePath, caption }) {
@@ -89,9 +162,10 @@ async function sendImageMessage({ to, imageUrl, imagePath, caption }) {
   }
 
   const client = await connectWhatsApp();
+  const jid = normalizeJid(to);
   const imagePayload = imagePath ? { url: imagePath } : { url: imageUrl };
 
-  return client.sendMessage(normalizeJid(to), {
+  return sendWithAck(client, jid, {
     image: imagePayload,
     caption: caption || "",
   });

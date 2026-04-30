@@ -6,6 +6,7 @@ API ini mendukung:
 - Kirim gambar + text (caption)
 
 Semua memakai session existing (`creds.json`) dari OpenClaw, jadi **tanpa scan QR**.
+Session hanya dipakai untuk autentikasi login, bukan membatasi tujuan kirim pesan.
 
 ## 1) Setup
 
@@ -44,6 +45,20 @@ Body:
   "text": "Halo dari API Baileys"
 }
 ```
+Response sukses sekarang menyertakan `ackStatus`:
+```json
+{
+  "ok": true,
+  "id": "3EB0XXXX",
+  "ackStatus": 1
+}
+```
+
+## Validasi Pengiriman (Strict)
+- API mengecek nomor tujuan valid di WhatsApp (`onWhatsApp`) sebelum kirim.
+- Setelah kirim, API menunggu ACK event message (`messages.update`) sampai timeout.
+- Jika timeout, API return error agar tidak dianggap sukses palsu.
+- Timeout bisa diatur via `MESSAGE_ACK_TIMEOUT_MS` (default 20000 ms).
 
 ### Kirim Gambar
 `POST /send-image`

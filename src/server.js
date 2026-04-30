@@ -21,7 +21,11 @@ app.get("/health", async (_req, res) => {
 app.post("/send-text", async (req, res) => {
   try {
     const result = await sendTextMessage(req.body);
-    return res.json({ ok: true, id: result?.key?.id });
+    return res.json({
+      ok: true,
+      id: result?.sent?.key?.id,
+      ackStatus: result?.ack?.status,
+    });
   } catch (error) {
     return res.status(400).json({ ok: false, error: error.message });
   }
@@ -30,7 +34,11 @@ app.post("/send-text", async (req, res) => {
 app.post("/send-image", async (req, res) => {
   try {
     const result = await sendImageMessage(req.body);
-    return res.json({ ok: true, id: result?.key?.id });
+    return res.json({
+      ok: true,
+      id: result?.sent?.key?.id,
+      ackStatus: result?.ack?.status,
+    });
   } catch (error) {
     return res.status(400).json({ ok: false, error: error.message });
   }
@@ -39,7 +47,11 @@ app.post("/send-image", async (req, res) => {
 app.post("/send-image-text", async (req, res) => {
   try {
     const result = await sendImageMessage(req.body);
-    return res.json({ ok: true, id: result?.key?.id });
+    return res.json({
+      ok: true,
+      id: result?.sent?.key?.id,
+      ackStatus: result?.ack?.status,
+    });
   } catch (error) {
     return res.status(400).json({ ok: false, error: error.message });
   }
