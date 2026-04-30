@@ -27,7 +27,7 @@ Semua memakai session existing (`creds.json`) dari OpenClaw, jadi **tanpa scan Q
 npm run start
 ```
 
-Default: `http://localhost:3000`
+Default bind: `0.0.0.0:3000` (bisa diakses dari network).
 
 ## 3) Endpoint
 

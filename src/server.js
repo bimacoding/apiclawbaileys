@@ -46,12 +46,14 @@ app.post("/send-image-text", async (req, res) => {
 });
 
 const port = Number(process.env.PORT || 3000);
-app.listen(port, async () => {
+const host = process.env.HOST || "0.0.0.0";
+
+app.listen(port, host, async () => {
   try {
     await connectWhatsApp();
-    console.log(`API jalan di http://localhost:${port}`);
+    console.log(`API jalan di http://${host}:${port}`);
   } catch (error) {
     console.error("Gagal konek WhatsApp:", error.message);
-    console.log(`API tetap jalan di http://localhost:${port}`);
+    console.log(`API tetap jalan di http://${host}:${port}`);
   }
 });
